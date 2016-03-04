@@ -24,6 +24,6 @@
 9. User creation:
  * If the Box is still in setup mode, it accepts this request and gives the app a token with admin access,
  * If an admin user already exists, this admin user is asked whether they want to allow the new user creation request.
-10.If the Box gets assigned a new local IP address through DHCP, it announces this new IP address using mDNS.
-
+10. If the Box gets assigned a new local IP address through DHCP, it announces this new IP address using mDNS.
+11. When selecting this discovery mechanism at build-time, it is not possible to use the tunnel for remote access.
 
