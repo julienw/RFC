@@ -6,7 +6,7 @@ We currently have three big centralized enums:
 
 - `ChannelKind`, designed to help discovering channels based on their features;
 - `Value`, designed to automate (de)serialization of values, on behalf of adapters;
-- `Message`, designed to help catch errors.
+- `Type`, designed to help catch errors.
 
 
 ## Pros
@@ -62,7 +62,7 @@ to the standard bundle.
 
 ## Values, serialization, deserialization
 
-We replace `Value` and `Message` by a new, extensible, trait `Message`. The (only)
+We replace `Value` and `Type` by a new, extensible, trait `Message`. The (only)
 role of a `Message` is to standardize (de)serialization.
 
 A crate `standardized` provides a library of standard `Message`s to cover most uses:
