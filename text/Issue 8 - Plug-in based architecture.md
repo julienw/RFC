@@ -1,10 +1,12 @@
+[TOC]
+
 # Back to basics
 
 We currently have three big centralized enums:
 
 - `ChannelKind`, designed to help discovering channels based on their features;
 - `Value`, designed to automate (de)serialization of values, on behalf of adapters;
-- `Type`, designed to help catch errors.
+- `Message`, designed to help catch errors.
 
 
 ## Pros
@@ -60,10 +62,10 @@ to the standard bundle.
 
 ## Values, serialization, deserialization
 
-We replace `Value` and `Type` by a new, extensible, trait `Type`. The (only)
-role of a `Type` is to standardize (de)serialization.
+We replace `Value` and `Message` by a new, extensible, trait `Message`. The (only)
+role of a `Message` is to standardize (de)serialization.
 
-A crate `standardized` provides a library of standard `Type`s to cover most uses:
+A crate `standardized` provides a library of standard `Message`s to cover most uses:
 - boolean;
 - string;
 - various number types;
@@ -75,11 +77,11 @@ A crate `standardized` provides a library of standard `Type`s to cover most uses
 - `RawBinary`;
 - ...
 
-Use of a `Type` is decided per-channel, by the Adapter developer.
+Use of a `Message` is decided per-channel, by the Adapter developer.
 
 When implementing a channel, adapter developers are encouraged to pick one
-of the full-featured `Type`s (e.g. temperature or time), or can also provide
-new implementations of `Type`, if they prefer. Additional instances of `Type`
+of the full-featured `Message`s (e.g. temperature or time), or can also provide
+new implementations of `Message`, if they prefer. Additional instances of `Message`
 can easily be published by third-party developers on third-party crates.
 
 While this is less optimal, Adapter developers can fallback to `RawJSON` or `RawBinary`
@@ -91,17 +93,20 @@ same value several times from JSON or Binary).
 ### Implementation
 
 ```rust
-trait Type: Sized {
+trait Message: Sized {
   /// Developer-oriented human-readable name, used mainly for error messages.
   ///
   /// For instance, `bool`, `positive number`, `temperature`.
   fn name() -> String;
 
+  /// Values carried by messages of this type.
+  type Type: Any;
+
   /// A mechanism used to serialize values of this type.
-  type Serializer: Serializer<Source = Self>;
+  type Serializer: Serializer<Source = Self::Type>;
 
   /// A mechanism used to deserialize values of this type.
-  type Deserializer: Deserializer<Target = Self>;
+  type Deserializer: Deserializer<Target = Self::Type>;
 }
 
 /// A mechanism used to serialize values of a given type.
@@ -150,7 +155,7 @@ by third-party developers to third-party crates.
 
 
 ```rust
-struct Feature<Type> {
+struct Feature<Message> where Message: Type {
   /// Keys used to discover this feature.
   ///
   /// For instance: `["x-oven-temperature", "oven-temperature"]`, where
@@ -158,21 +163,30 @@ struct Feature<Type> {
   /// `oven-temperature` is the standardized name.
   pub keys: Vec<String>,
 
-  phantom: PhantomData<Type>
+  phantom: PhantomData<Message>
 }
 ```
 
 
-## Registering a channel
+## Propagating the changes
 
-Registering a channel looks like:
+We modify the definition of channels to use `Feature<T>` instead of
+`ChannelKind`. Otherwise, this definition is unchanged. We similarly modify
+`add_getter`/`add_setter` to use this new definition of `Channel<T>`.
+
+In the implementation of `Adapter`, type `Value` is replaced by `Any`.
+
+In the Taxonomy API, type `Value` is replaced by `Message`.
+
+### Implementation
 
 ```rust
-impl AdapterManager {
-  fn add_setter<T>(&self, adapter: &Id<AdapterId>, id: &Id<Setter>,
-    feature: &Feature<T>) where T: Type;
-  fn add_getter<T>(&self, adapter: &Id<AdapterId>, id: &Id<Getter>,
-    feature: &Feature<T>) where T: Type;
+trait Adapter {
+  fn fetch_values(&self, set: &[Id<Getter>], user: User) ->
+    ResultMap<Id<Getter>, Option<Box<Any>>, Error>;
+
+  fn send_values(&self, values: HashMap<Id<Setter>, &Any>, user: User) ->
+    ResultMap<Id<Setter>, (), Error>;
 }
 ```
 
@@ -181,17 +195,17 @@ impl AdapterManager {
 
 ## Conflicts
 
-Having the same `Type` in several Adapters causes no conflict.
+Having the same `Message` in several Adapters causes no conflict.
 
 Several instances of `Feature` may share some or all `keys`, possibly with
-different instances of `Type`. This will commonly be the case for features that
+different instances of `Message`. This will commonly be the case for features that
 have not been standardized yet but that are implemented by several
 devices/adapters, or that have been standardized recently. This is considered
 normal. The AdapterManager will handle this, by dispatching per key, rather
 than by `Feature`.
 
-If several Adapters use distinct instances of `Type` for the same `keys`, or
-use the `RawBinary`/`RawJSON` `Type`, this may cause a request to the Foxbox to
+If several Adapters use distinct instances of `Message` for the same `keys`, or
+use the `RawBinary`/`RawJSON` `Message`, this may cause a request to the Foxbox to
 be fail due to a parse error or a serialization error with some adapters and
 succeed for others. Similarly, this may cause a request to the Foxbox to return
 different serialized representations for the same value from several adapters.
@@ -201,18 +215,23 @@ We consider that this is an acceptable trade-off for decentralization.
 ## Performance
 
 The `AdapterManager` can be refactored to attempt to group channels with the
-same key + `Type` together. This will let the `AdapterManager` perform a single
+same key + `Message` together. This will let the `AdapterManager` perform a single
 parsing for each value for all such channels, without loss of performance wrt
-the current solution when the channels all the same precise `Type`
+the current solution when the channels all the same precise `Message`
 (i.e. not `RawJSON` or `RawBinary`).
+
+Channels using `RawJSON` or `RawBinary` are expected to be slower than those
+using more precise types.
+
+There will be a small cost associated to using `Any` instead of `Value`, but
+this should be extremely small.
 
 
 ## Changes to developers of Adapters
 
-With this solution, developers of Adapters now have more choice. Any `Type`
+With this solution, developers of Adapters now have more choice. Any `Message`
 and `Feature` can come from the standard bundle, third-party crates, or their
-own code. Existing Adapters will require some surface rewrite, due to minor
-API changes.
+own code.
 
 This solution should also bring us one step forward towards implementing
 Adapters in other programming languages.
