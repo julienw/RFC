@@ -132,10 +132,10 @@ and are not specific to this RFC.
 
 ## Channel features
 
-We replace `ChannelKind` with `Feature`. The role of a `Feature` is to allow an
-application to discover channels (respectively service) that implement a given
-feature (respectively feature set), and to standardize the (de)serialization
-format for this channel.
+We replace `ChannelKind` with `Feature`. As `ChannelKind`, the role of a
+`Feature` is to allow an application to discover channels (respectively service)
+that implement a given feature (respectively feature set), and to standardize
+the (de)serialization format for this channel.
 
 A crate `standardized` provides a library of standard `Feature`s to cover a number
 of uses:
@@ -155,7 +155,7 @@ by third-party developers to third-party crates.
 
 
 ```rust
-struct Feature<Message> where Message: Type {
+struct Feature<T> where T: Message {
   /// Keys used to discover this feature.
   ///
   /// For instance: `["x-oven-temperature", "oven-temperature"]`, where
@@ -163,7 +163,7 @@ struct Feature<Message> where Message: Type {
   /// `oven-temperature` is the standardized name.
   pub keys: Vec<String>,
 
-  phantom: PhantomData<Message>
+  phantom: PhantomData<T>
 }
 ```
 
@@ -176,9 +176,32 @@ We modify the definition of channels to use `Feature<T>` instead of
 
 In the implementation of `Adapter`, type `Value` is replaced by `Any`.
 
-In the Taxonomy API, type `Value` is replaced by `Message`.
+In the Taxonomy API, type `Value` is replaced by `JSON`, with a companion `BinaryParts`.
 
 ### Implementation
+
+```rust
+pub enum WatchEvent {
+  EnterRange {
+    from: Id<Getter>,
+    json: JSON,
+    binary: BinaryParts
+  },
+  ExitRange {
+    from: Id<Getter>,
+    json: JSON,
+    binary: BinaryParts
+  },
+  // ...
+}
+
+trait API {
+  fn fetch_values(&self, Vec<GetterSelector>, user: User) ->
+    (ResultMap<Id<Getter>, Option<JSON>, Error>, BinaryParts);
+  fn send_values(&self, TargetMap<SetterSelector, JSON>, binary: &BinaryParts,
+    user: User) -> ResultMap<Id<Setter>, (), Error>;
+}
+```
 
 ```rust
 trait Adapter {
@@ -208,7 +231,8 @@ If several Adapters use distinct instances of `Message` for the same `keys`, or
 use the `RawBinary`/`RawJSON` `Message`, this may cause a request to the Foxbox to
 be fail due to a parse error or a serialization error with some adapters and
 succeed for others. Similarly, this may cause a request to the Foxbox to return
-different serialized representations for the same value from several adapters.
+messages with completely unrelated serialization formats for several adapters
+implementing the same key.
 
 We consider that this is an acceptable trade-off for decentralization.
 
