@@ -24,7 +24,7 @@
 9. The user can use the normal browser on their client to open our web app.
 10. The Box posts its long URL "https://<serial-no>.knilxof-local.org/" to https://discover.knilxof.org/I-am-a-Box.
 11. The Bridge adds an entry to its database linking the outgoing IP address of the Box to its long URL.
-12. The user types https://discover.knilxof.org/I-am-a-client.html into their browser's address bar, and the Bridge does a database lookup;
+12. While connected from that same outgoing IP address as the Box, the user types https://discover.knilxof.org/I-am-a-client.html into their browser's address bar, and the Bridge does a database lookup;
  * If there is exactly one Box registered from that same outgoing IP address, the user is asked to check that the <serial-no> matches the one on the sticker, and if they click 'Yes', they are redirected to https://<serial-no>.knilxof-local.org/
  * If there are no Boxes registered for that same outgoing IP address, an error is displayed.
  * If there are  >1 Boxes registered for that same outgoing IP address, the user is offered a choice, and told to select the serial-no that matches the one on the sticker on their Box, after which the user is redirected to https://<serial-no>.knilxof.org/ for the serial-no they selected.
